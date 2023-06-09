@@ -14,7 +14,7 @@ import simpleaudio as sa
 
 
 class SpeechRecognition:
-    def __init__(self, dataset_dir='./datasets/my_voice'):
+    def __init__(self, dataset_dir='./datasets/SR_training'):
         self.recognizer = sr.Recognizer()
         self.dataset_dir = dataset_dir
         os.makedirs(dataset_dir, exist_ok=True)
@@ -52,7 +52,7 @@ class SpeechRecognition:
 
         return sentences
 
-    def record_sentences(self, sentences):
+    def record_sentences(self, sentences, retry_prompt=True):
         dataset = []
         temp_dir = os.path.join(self.dataset_dir, 'temp')
         os.makedirs(temp_dir, exist_ok=True)
@@ -61,14 +61,26 @@ class SpeechRecognition:
             sentence = sentence_dict['sentence']
             print(f"Say: {sentence}")
             tts = gTTS(sentence, lang="en")
+
             with tempfile.NamedTemporaryFile(delete=False, dir=temp_dir, suffix='.mp3') as fp:
                 temp_filename = fp.name
                 tts.save(temp_filename)
                 segment = AudioSegment.from_file(temp_filename, format="mp3")
                 play(segment)
-                recorded_audio = self.record_voice(sentence)
-                filename = self.save_wav_file(sentence, recorded_audio)
-                dataset.append({"path": filename, "transcription": sentence})
+
+                while True:
+                    recorded_audio = self.record_voice(sentence)
+                    filename = self.save_wav_file(sentence, recorded_audio)
+                    dataset.append({"path": filename, "transcription": sentence})
+
+                    if not retry_prompt:
+                        break
+
+                    choice = input("Do you want to save the recording? (y/n): ")
+                    if choice.lower() == "y":
+                        break
+                    elif choice.lower() == "n":
+                        dataset.pop()
 
         # Save the dataset to a JSON file
         dataset_file = os.path.join(self.dataset_dir, 'dataset.json')
@@ -85,7 +97,7 @@ class SpeechRecognition:
 
     def save_wav_file(self, sentence, recorded_audio):
         filename = f"{hash(sentence)}_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.wav"
-        filename = os.path.join(self.dataset_dir, filename)
+        filename = os.path.join(self.dataset_dir, 'recordings', filename)
         with open(filename, "wb") as f:
             f.write(recorded_audio.get_wav_data())
         return filename
@@ -109,7 +121,7 @@ def main():
         speech_recognition.create_dataset(record=record)
 
     # Define the path to the dataset
-    dataset_path = './datasets/my_voice/sentences.json'
+    dataset_path = 'datasets/SR_training/sentences.json'
 
     # Fine-tune the model
     # SpeechRecognition.fine_tune_model(dataset_path)

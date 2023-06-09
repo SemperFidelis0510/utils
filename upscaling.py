@@ -26,7 +26,7 @@ def upscale_image(input_path, output_path=None):
     print(input_path)
     if output_path is None:
         picname = os.path.basename(input_path)
-        output_path = f'upscaled\\{os.path.splitext(picname)[0]}_upscaled{os.path.splitext(picname)[1]}'
+        output_path = f'outputs/upscaled\\{os.path.splitext(picname)[0]}_upscaled{os.path.splitext(picname)[1]}'
 
     # Read the image
     img = cv2.imread(input_path)
