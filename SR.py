@@ -33,38 +33,38 @@ class SpeechRecognition:
                 print("Could not request results from Google Speech Recognition service; {0}".format(e))
         return text
 
-    def create_dataset(self, sentences_file='sentences.json'):
+    def create_dataset(self, sentences_file='sentences.json', record=True):
         n = 10
         sentences_file = os.path.join(self.dataset_dir, sentences_file)
         if os.path.exists(sentences_file):
             with open(sentences_file, 'r') as f:
-                sentences = [line.strip() for line in f]
+                sentences = json.load(f)
         else:
-            sentences = self.get_random_sentences(n)
+            sentences = self.generate_random_sentences(10)
+            sentence_dicts = [{"sentence": sentence} for sentence in sentences]
             with open(sentences_file, 'w') as f:
-                for sentence in sentences:
-                    json.dump({"sentence": sentence}, f)
-                    f.write('\n')
+                json.dump(sentence_dicts, f)
 
-        for sentence in sentences:
-            # Save gTTS object to a temporary file
-            fd, path = tempfile.mkstemp()
-            try:
-                with os.fdopen(fd, 'w') as tmp:
-                    tts = gTTS(sentence, lang="en")
-                    tts.save(path)
-                    # Load temporary file into an AudioSegment
-                    segment = AudioSegment.from_file(path, format="mp3")
-                    # Convert to wav
-                    wav_data = segment.export(format="wav")
-                    # Play the audio using simpleaudio
-                    wave_obj = sa.WaveObject.from_wave_file(wav_data)
-                    play_obj = wave_obj.play()
-                    play_obj.wait_done()
-                    recorded_audio = self.record_sentence(sentence)
-                    self.save_wav_file(sentence, recorded_audio)
-            finally:
-                os.remove(path)  # Delete the temporary file
+        if record:
+            for sentence in sentences:
+                # Save gTTS object to a temporary file
+                fd, path = tempfile.mkstemp()
+                try:
+                    with os.fdopen(fd, 'w') as tmp:
+                        tts = gTTS(sentence, lang="en")
+                        tts.save(path)
+                        # Load temporary file into an AudioSegment
+                        segment = AudioSegment.from_file(path, format="mp3")
+                        # Convert to wav
+                        wav_data = segment.export(format="wav")
+                        # Play the audio using simpleaudio
+                        wave_obj = sa.WaveObject.from_wave_file(wav_data)
+                        play_obj = wave_obj.play()
+                        play_obj.wait_done()
+                        recorded_audio = self.record_sentence(sentence)
+                        self.save_wav_file(sentence, recorded_audio)
+                finally:
+                    os.remove(path)  # Delete the temporary file
 
     @staticmethod
     def fine_tune_model(dataset_path):
@@ -116,7 +116,7 @@ class SpeechRecognition:
 
     def record_sentence(self, sentence):
         # List all available microphones
-        print(sr.Microphone.list_microphone_names())
+        # print(sr.Microphone.list_microphone_names())
 
         mic_index = 1
         with sr.Microphone(device_index=mic_index) as source:
@@ -126,11 +126,13 @@ class SpeechRecognition:
 
 
 def main():
+    get_data = False
     # Initialize the SpeechRecognition class
     speech_recognition = SpeechRecognition()
 
     # Create the dataset
-    speech_recognition.create_dataset()
+    if get_data:
+        speech_recognition.create_dataset()
 
     # Define the path to the dataset
     dataset_path = './datasets/my_voice/sentences.json'
