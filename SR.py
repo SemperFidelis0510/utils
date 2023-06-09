@@ -77,11 +77,11 @@ class SpeechRecognition:
                     if not retry_prompt:
                         break
 
-                    choice = input("Do you want to save the recording? (y/n): ")
-                    if choice.lower() == "y":
-                        break
-                    elif choice.lower() == "n":
+                    choice = input("Do you want to save the recording?: ")
+                    if choice.lower() == "n":
                         dataset.pop()
+                    else:
+                        break
 
         # Save the dataset to a JSON file
         dataset_file = os.path.join(self.dataset_dir, 'dataset.json')
@@ -178,11 +178,10 @@ def main():
     if args.get:
         speech_recognition.create_dataset(record=args.norec)
 
-    # Define the path to the dataset
-    dataset_path = 'datasets/SR_training/sentences.json'
-
     # Fine-tune the model
     if args.train:
+        # Define the path to the dataset
+        dataset_path = 'datasets/SR_training/dataset.json'
         speech_recognition.fine_tune_model(dataset_path)
 
 
