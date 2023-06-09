@@ -1,4 +1,4 @@
-"The quick brown fox jumps over the lazy dog."
+﻿"The quick brown fox jumps over the lazy dog."
 "I love to watch the sunset by the beach."
 "She was too short to see over the fence."
 "I will have a cup of coffee with cream and sugar."

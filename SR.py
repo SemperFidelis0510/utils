@@ -37,68 +37,36 @@ class SpeechRecognition:
         n = 10
         sentences_file = os.path.join(self.dataset_dir, sentences_file)
         if os.path.exists(sentences_file):
-            with open(sentences_file, 'r') as f:
+            with open(sentences_file, 'r', encoding='utf-8') as f:
                 sentences = json.load(f)
         else:
-            sentences = self.generate_random_sentences(10)
+            sentences = self.get_random_sentences(10)
             sentence_dicts = [{"sentence": sentence} for sentence in sentences]
             with open(sentences_file, 'w') as f:
                 json.dump(sentence_dicts, f)
 
         if record:
-            for sentence in sentences:
-                # Save gTTS object to a temporary file
-                fd, path = tempfile.mkstemp()
-                try:
-                    with os.fdopen(fd, 'w') as tmp:
-                        tts = gTTS(sentence, lang="en")
-                        tts.save(path)
-                        # Load temporary file into an AudioSegment
-                        segment = AudioSegment.from_file(path, format="mp3")
-                        # Convert to wav
-                        wav_data = segment.export(format="wav")
-                        # Play the audio using simpleaudio
-                        wave_obj = sa.WaveObject.from_wave_file(wav_data)
-                        play_obj = wave_obj.play()
-                        play_obj.wait_done()
-                        recorded_audio = self.record_sentence(sentence)
-                        self.save_wav_file(sentence, recorded_audio)
-                finally:
-                    os.remove(path)  # Delete the temporary file
+            dataset = []
+            temp_dir = os.path.join(self.dataset_dir, 'temp')
+            os.makedirs(temp_dir, exist_ok=True)  # Create the temporary directory if it doesn't exist
 
-    @staticmethod
-    def fine_tune_model(dataset_path):
-        dataset = load_dataset('json', data_files=dataset_path)
-        model = Wav2Vec2ForCTC.from_pretrained("facebook/wav2vec2-base")
-        processor = Wav2Vec2Processor.from_pretrained("facebook/wav2vec2-base")
+            for sentence_dict in sentences:
+                sentence = sentence_dict['sentence']
+                print(f"Say: {sentence}")
+                tts = gTTS(sentence, lang="en")
+                with tempfile.NamedTemporaryFile(delete=False, dir=temp_dir, suffix='.mp3') as fp:
+                    temp_filename = fp.name
+                    tts.save(temp_filename)
+                    segment = AudioSegment.from_file(temp_filename, format="mp3")
+                    play(segment)
+                    recorded_audio = self.record_sentence(sentence)
+                    filename = self.save_wav_file(sentence, recorded_audio)
+                    dataset.append({"path": filename, "transcription": sentence})
 
-        def prepare_dataset(batch):
-            input_values = processor(batch["path"], sampling_rate=16000, return_tensors="pt", padding=True,
-                                     max_length=1024).input_values
-            with processor.as_target_processor():
-                labels = processor(batch["transcription"], return_tensors="pt", padding=True).input_ids
-            return {"input_values": input_values, "labels": labels}
-
-        preprocessed_dataset = dataset.map(prepare_dataset, batched=True, remove_columns=["path", "transcription"])
-
-        training_args = TrainingArguments(
-            output_dir="./output",
-            num_train_epochs=3,
-            per_device_train_batch_size=8,
-            learning_rate=5e-5,
-            weight_decay=0.01,
-            logging_dir="./logs"
-        )
-
-        trainer = Trainer(
-            model=model,
-            args=training_args,
-            train_dataset=preprocessed_dataset["train"],
-            data_collator=lambda data: {"input_values": data[0]["input_values"], "labels": data[0]["labels"]}
-        )
-
-        trainer.train()
-        model.save_pretrained("./output")
+            # Save the dataset to a JSON file
+            dataset_file = os.path.join(self.dataset_dir, 'dataset.json')
+            with open(dataset_file, 'w') as f:
+                json.dump(dataset, f)
 
     def get_random_sentences(self, n):
         sentences_file = os.path.join(self.dataset_dir, 'sentences.txt')
@@ -115,9 +83,6 @@ class SpeechRecognition:
             f.write(recorded_audio.get_wav_data())
 
     def record_sentence(self, sentence):
-        # List all available microphones
-        # print(sr.Microphone.list_microphone_names())
-
         mic_index = 1
         with sr.Microphone(device_index=mic_index) as source:
             print(f"Say: {sentence}")
@@ -126,19 +91,20 @@ class SpeechRecognition:
 
 
 def main():
-    get_data = False
+    get_data = True
+    record = True
     # Initialize the SpeechRecognition class
     speech_recognition = SpeechRecognition()
 
     # Create the dataset
     if get_data:
-        speech_recognition.create_dataset()
+        speech_recognition.create_dataset(record=record)
 
     # Define the path to the dataset
     dataset_path = './datasets/my_voice/sentences.json'
 
     # Fine-tune the model
-    SpeechRecognition.fine_tune_model(dataset_path)
+    # SpeechRecognition.fine_tune_model(dataset_path)
 
 
 if __name__ == "__main__":
