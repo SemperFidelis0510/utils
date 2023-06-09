@@ -161,7 +161,7 @@ class SpeechRecognition:
 def parse():
     parser = argparse.ArgumentParser()
     parser.add_argument('--get', help="Get dataset.", default=False, const=True, nargs='?')
-    parser.add_argument('--norec', help="Disables recording when getting dataset.", default=False, const=True,
+    parser.add_argument('--norec', help="Disables recording when getting dataset.", default=True, const=False,
                         nargs='?')
     parser.add_argument('--speak', help="The bot will read the sentences that needed to be read.", default=False,
                         const=True, nargs='?')
