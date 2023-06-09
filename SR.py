@@ -11,6 +11,7 @@ from pydub import AudioSegment
 import tempfile
 import random
 import simpleaudio as sa
+import argparse
 
 
 class SpeechRecognition:
@@ -109,22 +110,80 @@ class SpeechRecognition:
             audio = self.recognizer.listen(source)
         return audio
 
+    @staticmethod
+    def load_dataset_and_model(dataset_path):
+        dataset = load_dataset('json', data_files=dataset_path)
+        model = Wav2Vec2ForCTC.from_pretrained("facebook/wav2vec2-base")
+        processor = Wav2Vec2Processor.from_pretrained("facebook/wav2vec2-base")
+        return dataset, model, processor
+
+    @staticmethod
+    def prepare_dataset(processor, batch):
+        input_values = processor(batch["path"], sampling_rate=16000, return_tensors="pt", padding=True,
+                                 max_length=1024).input_values
+        with processor.as_target_processor():
+            labels = processor(batch["transcription"], return_tensors="pt", padding=True).input_ids
+        return {"input_values": input_values, "labels": labels}
+
+    def preprocess_dataset(self, dataset, processor):
+        return dataset.map(lambda batch: self.prepare_dataset(processor, batch),
+                           batched=True, remove_columns=["path", "transcription"])
+
+    @staticmethod
+    def setup_training_args():
+        return TrainingArguments(
+            output_dir="./output",
+            num_train_epochs=3,
+            per_device_train_batch_size=8,
+            learning_rate=5e-5,
+            weight_decay=0.01,
+            logging_dir="./logs"
+        )
+
+    @staticmethod
+    def train_model(model, preprocessed_dataset, training_args):
+        trainer = Trainer(
+            model=model,
+            args=training_args,
+            train_dataset=preprocessed_dataset["train"],
+            data_collator=lambda data: {"input_values": data[0]["input_values"], "labels": data[0]["labels"]}
+        )
+        trainer.train()
+        model.save_pretrained("./output")
+
+    def fine_tune_model(self, dataset_path):
+        dataset, model, processor = self.load_dataset_and_model(dataset_path)
+        preprocessed_dataset = self.preprocess_dataset(dataset, processor)
+        training_args = self.setup_training_args()
+        self.train_model(model, preprocessed_dataset, training_args)
+
+
+def parse():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--get', help="Get dataset.", default=False, const=True, nargs='?')
+    parser.add_argument('--norec', help="Disables recording when getting dataset.", default=False, const=True,
+                        nargs='?')
+    parser.add_argument('--speak', help="The bot will read the sentences that needed to be read.", default=False,
+                        const=True, nargs='?')
+    parser.add_argument('--train', help="Starts training.", default=False, const=True, nargs='?')
+    return parser.parse_args()
+
 
 def main():
-    get_data = True
-    record = True
+    args = parse()
     # Initialize the SpeechRecognition class
     speech_recognition = SpeechRecognition()
 
     # Create the dataset
-    if get_data:
-        speech_recognition.create_dataset(record=record)
+    if args.get:
+        speech_recognition.create_dataset(record=args.norec)
 
     # Define the path to the dataset
     dataset_path = 'datasets/SR_training/sentences.json'
 
     # Fine-tune the model
-    # SpeechRecognition.fine_tune_model(dataset_path)
+    if args.train:
+        speech_recognition.fine_tune_model(dataset_path)
 
 
 if __name__ == "__main__":
