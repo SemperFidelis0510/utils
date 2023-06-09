@@ -113,21 +113,21 @@ class SpeechRecognition:
     @staticmethod
     def load_dataset_and_model(dataset_path):
         dataset = load_dataset('json', data_files=dataset_path)
+        dataset = dataset.map(lambda example: {"sentence": str(example["sentence"])})
         model = Wav2Vec2ForCTC.from_pretrained("facebook/wav2vec2-base")
         processor = Wav2Vec2Processor.from_pretrained("facebook/wav2vec2-base")
         return dataset, model, processor
 
     @staticmethod
     def prepare_dataset(processor, batch):
-        input_values = processor(batch["path"], sampling_rate=16000, return_tensors="pt", padding=True,
-                                 max_length=1024).input_values
+        input_values = processor(batch["sentence"], sampling_rate=16000, return_tensors="pt", padding=True).input_values
         with processor.as_target_processor():
-            labels = processor(batch["transcription"], return_tensors="pt", padding=True).input_ids
+            labels = processor(batch["sentence"], return_tensors="pt", padding=True).input_ids
         return {"input_values": input_values, "labels": labels}
 
     def preprocess_dataset(self, dataset, processor):
         return dataset.map(lambda batch: self.prepare_dataset(processor, batch),
-                           batched=True, remove_columns=["path", "transcription"])
+                           batched=True, remove_columns=["sentence"])
 
     @staticmethod
     def setup_training_args():
