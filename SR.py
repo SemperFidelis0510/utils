@@ -34,6 +34,11 @@ class SpeechRecognition:
         return text
 
     def create_dataset(self, sentences_file='sentences.json', record=True):
+        sentences = self.get_sentences(sentences_file=sentences_file)
+        if record:
+            self.record_sentences(sentences)
+
+    def get_sentences(self, sentences_file='sentences.json'):
         n = 10
         sentences_file = os.path.join(self.dataset_dir, sentences_file)
         if os.path.exists(sentences_file):
@@ -41,32 +46,34 @@ class SpeechRecognition:
                 sentences = json.load(f)
         else:
             sentences = self.get_random_sentences(10)
-            sentence_dicts = [{"sentence": sentence} for sentence in sentences]
+            sentences = [{"sentence": sentence} for sentence in sentences]
             with open(sentences_file, 'w') as f:
-                json.dump(sentence_dicts, f)
+                json.dump(sentences, f)
 
-        if record:
-            dataset = []
-            temp_dir = os.path.join(self.dataset_dir, 'temp')
-            os.makedirs(temp_dir, exist_ok=True)  # Create the temporary directory if it doesn't exist
+        return sentences
 
-            for sentence_dict in sentences:
-                sentence = sentence_dict['sentence']
-                print(f"Say: {sentence}")
-                tts = gTTS(sentence, lang="en")
-                with tempfile.NamedTemporaryFile(delete=False, dir=temp_dir, suffix='.mp3') as fp:
-                    temp_filename = fp.name
-                    tts.save(temp_filename)
-                    segment = AudioSegment.from_file(temp_filename, format="mp3")
-                    play(segment)
-                    recorded_audio = self.record_sentence(sentence)
-                    filename = self.save_wav_file(sentence, recorded_audio)
-                    dataset.append({"path": filename, "transcription": sentence})
+    def record_sentences(self, sentences):
+        dataset = []
+        temp_dir = os.path.join(self.dataset_dir, 'temp')
+        os.makedirs(temp_dir, exist_ok=True)
 
-            # Save the dataset to a JSON file
-            dataset_file = os.path.join(self.dataset_dir, 'dataset.json')
-            with open(dataset_file, 'w') as f:
-                json.dump(dataset, f)
+        for sentence_dict in sentences:
+            sentence = sentence_dict['sentence']
+            print(f"Say: {sentence}")
+            tts = gTTS(sentence, lang="en")
+            with tempfile.NamedTemporaryFile(delete=False, dir=temp_dir, suffix='.mp3') as fp:
+                temp_filename = fp.name
+                tts.save(temp_filename)
+                segment = AudioSegment.from_file(temp_filename, format="mp3")
+                play(segment)
+                recorded_audio = self.record_voice(sentence)
+                filename = self.save_wav_file(sentence, recorded_audio)
+                dataset.append({"path": filename, "transcription": sentence})
+
+        # Save the dataset to a JSON file
+        dataset_file = os.path.join(self.dataset_dir, 'dataset.json')
+        with open(dataset_file, 'w') as f:
+            json.dump(dataset, f)
 
     def get_random_sentences(self, n):
         sentences_file = os.path.join(self.dataset_dir, 'sentences.txt')
@@ -81,11 +88,12 @@ class SpeechRecognition:
         filename = os.path.join(self.dataset_dir, filename)
         with open(filename, "wb") as f:
             f.write(recorded_audio.get_wav_data())
+        return filename
 
-    def record_sentence(self, sentence):
+    def record_voice(self, sentence):
         mic_index = 1
         with sr.Microphone(device_index=mic_index) as source:
-            print(f"Say: {sentence}")
+            print(f"Speak")
             audio = self.recognizer.listen(source)
         return audio
 
