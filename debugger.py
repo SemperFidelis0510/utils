@@ -7,10 +7,11 @@ import subprocess
 import json
 import time
 import re
+from termcolor import colored
 
 
 class Code:
-    def __init__(self, code, output, error, path=''):
+    def __init__(self, code, output=None, error=None, path=''):
         self.code = code
         self.output = output
         self.error = error
@@ -149,16 +150,16 @@ def parse():
 def main():
     args = parse()
     j = 0
-    args.file = 'SR.py'
+    args.file = 'SR2.py'
     args.args = '--train'
 
     for i in range(args.n):
         j = i
 
         code = run_python_file(args.file, args.env, args.args)
-        print(f'code:{compile_code(code)}')
-        print(f'output:{code.output}')
-        print(f'error:{code.error}')
+        print(colored(f'code:\n{compile_code(code)}', 'yellow'))
+        print(colored(f'output:\n{code.output}', 'blue'))
+        print(colored(f'error:\n{code.error}', 'red'))
 
         if code.error == '':
             break
