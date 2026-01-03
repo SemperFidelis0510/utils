@@ -15,13 +15,13 @@ import argparse
 
 
 class SpeechRecognition:
-    def __init__(self, dataset_dir='./datasets/SR_training'):
+    def __init__(self, dataset_dir="./datasets/SR_training"):
         self.recognizer = sr.Recognizer()
         self.dataset_dir = dataset_dir
         os.makedirs(dataset_dir, exist_ok=True)
 
     def activate_voice_command(self):
-        text = ''
+        text = ""
         with sr.Microphone() as source:
             print("Listening...")
             audio = self.recognizer.listen(source)
@@ -31,39 +31,45 @@ class SpeechRecognition:
             except sr.UnknownValueError:
                 print("Google Speech Recognition could not understand audio")
             except sr.RequestError as e:
-                print("Could not request results from Google Speech Recognition service; {0}".format(e))
+                print(
+                    "Could not request results from Google Speech Recognition service; {0}".format(
+                        e
+                    )
+                )
         return text
 
-    def create_dataset(self, sentences_file='sentences.json', record=True):
+    def create_dataset(self, sentences_file="sentences.json", record=True):
         sentences = self.get_sentences(sentences_file=sentences_file)
         if record:
             self.record_sentences(sentences)
 
-    def get_sentences(self, sentences_file='sentences.json'):
+    def get_sentences(self, sentences_file="sentences.json"):
         n = 10
         sentences_file = os.path.join(self.dataset_dir, sentences_file)
         if os.path.exists(sentences_file):
-            with open(sentences_file, 'r', encoding='utf-8') as f:
+            with open(sentences_file, "r", encoding="utf-8") as f:
                 sentences = json.load(f)
         else:
             sentences = self.get_random_sentences(10)
             sentences = [{"sentence": sentence} for sentence in sentences]
-            with open(sentences_file, 'w') as f:
+            with open(sentences_file, "w") as f:
                 json.dump(sentences, f)
 
         return sentences
 
     def record_sentences(self, sentences, retry_prompt=True):
         dataset = []
-        temp_dir = os.path.join(self.dataset_dir, 'temp')
+        temp_dir = os.path.join(self.dataset_dir, "temp")
         os.makedirs(temp_dir, exist_ok=True)
 
         for sentence_dict in sentences:
-            sentence = sentence_dict['sentence']
+            sentence = sentence_dict["sentence"]
             print(f"Say: {sentence}")
             tts = gTTS(sentence, lang="en")
 
-            with tempfile.NamedTemporaryFile(delete=False, dir=temp_dir, suffix='.mp3') as fp:
+            with tempfile.NamedTemporaryFile(
+                delete=False, dir=temp_dir, suffix=".mp3"
+            ) as fp:
                 temp_filename = fp.name
                 tts.save(temp_filename)
                 segment = AudioSegment.from_file(temp_filename, format="mp3")
@@ -84,21 +90,23 @@ class SpeechRecognition:
                         break
 
         # Save the dataset to a JSON file
-        dataset_file = os.path.join(self.dataset_dir, 'dataset.json')
-        with open(dataset_file, 'w') as f:
+        dataset_file = os.path.join(self.dataset_dir, "dataset.json")
+        with open(dataset_file, "w") as f:
             json.dump(dataset, f)
 
     def get_random_sentences(self, n):
-        sentences_file = os.path.join(self.dataset_dir, 'sentences.txt')
-        with open(sentences_file, 'r', encoding='utf-8') as f:
+        sentences_file = os.path.join(self.dataset_dir, "sentences.txt")
+        with open(sentences_file, "r", encoding="utf-8") as f:
             sentences = [line.strip() for line in f]
 
         random_sentences = random.sample(sentences, n)
         return random_sentences
 
     def save_wav_file(self, sentence, recorded_audio):
-        filename = f"{hash(sentence)}_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.wav"
-        filename = os.path.join(self.dataset_dir, 'recordings', filename)
+        filename = (
+            f"{hash(sentence)}_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.wav"
+        )
+        filename = os.path.join(self.dataset_dir, "recordings", filename)
         with open(filename, "wb") as f:
             f.write(recorded_audio.get_wav_data())
         return filename
@@ -112,22 +120,30 @@ class SpeechRecognition:
 
     @staticmethod
     def load_dataset_and_model(dataset_path):
-        dataset = load_dataset('json', data_files=dataset_path)
-dataset = dataset.map(lambda example: {"input_text": str(example["input_text"])})
-        model = Wav2Vec2ForCTC.from_pretrained("facebook/wav2vec2-base")
+        dataset = load_dataset("json", data_files=dataset_path)
+        dataset = dataset.map(
+            lambda example: {"input_text": str(example["input_text"])}
+        )
         processor = Wav2Vec2Processor.from_pretrained("facebook/wav2vec2-base")
         return dataset, model, processor
 
     @staticmethod
     def prepare_dataset(processor, batch):
-        input_values = processor(batch["sentence"], sampling_rate=16000, return_tensors="pt", padding=True).input_values
+        input_values = processor(
+            batch["sentence"], sampling_rate=16000, return_tensors="pt", padding=True
+        ).input_values
         with processor.as_target_processor():
-            labels = processor(batch["sentence"], return_tensors="pt", padding=True).input_ids
+            labels = processor(
+                batch["sentence"], return_tensors="pt", padding=True
+            ).input_ids
         return {"input_values": input_values, "labels": labels}
 
     def preprocess_dataset(self, dataset, processor):
-        return dataset.map(lambda batch: self.prepare_dataset(processor, batch),
-                           batched=True, remove_columns=["sentence"])
+        return dataset.map(
+            lambda batch: self.prepare_dataset(processor, batch),
+            batched=True,
+            remove_columns=["sentence"],
+        )
 
     @staticmethod
     def setup_training_args():
@@ -137,7 +153,7 @@ dataset = dataset.map(lambda example: {"input_text": str(example["input_text"])}
             per_device_train_batch_size=8,
             learning_rate=5e-5,
             weight_decay=0.01,
-            logging_dir="./logs"
+            logging_dir="./logs",
         )
 
     @staticmethod
@@ -146,7 +162,10 @@ dataset = dataset.map(lambda example: {"input_text": str(example["input_text"])}
             model=model,
             args=training_args,
             train_dataset=preprocessed_dataset["train"],
-            data_collator=lambda data: {"input_values": data[0]["input_values"], "labels": data[0]["labels"]}
+            data_collator=lambda data: {
+                "input_values": data[0]["input_values"],
+                "labels": data[0]["labels"],
+            },
         )
         trainer.train()
         model.save_pretrained("./output")
@@ -160,12 +179,26 @@ dataset = dataset.map(lambda example: {"input_text": str(example["input_text"])}
 
 def parse():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--get', help="Get dataset.", default=False, const=True, nargs='?')
-    parser.add_argument('--norec', help="Disables recording when getting dataset.", default=True, const=False,
-                        nargs='?')
-    parser.add_argument('--speak', help="The bot will read the sentences that needed to be read.", default=False,
-                        const=True, nargs='?')
-    parser.add_argument('--train', help="Starts training.", default=False, const=True, nargs='?')
+    parser.add_argument(
+        "--get", help="Get dataset.", default=False, const=True, nargs="?"
+    )
+    parser.add_argument(
+        "--norec",
+        help="Disables recording when getting dataset.",
+        default=True,
+        const=False,
+        nargs="?",
+    )
+    parser.add_argument(
+        "--speak",
+        help="The bot will read the sentences that needed to be read.",
+        default=False,
+        const=True,
+        nargs="?",
+    )
+    parser.add_argument(
+        "--train", help="Starts training.", default=False, const=True, nargs="?"
+    )
     return parser.parse_args()
 
 
@@ -181,8 +214,8 @@ def main():
     # Fine-tune the model
     if args.train:
         # Define the path to the dataset
-        dataset_path = 'datasets/SR_training/dataset.json'
-        speech_recognition.fine_tune_model(dataset_path)
+        dataset_path = "datasets/SR_training/dataset.json"
+        dataset_path = "D:\\Pandora\\utils\\datasets\\SR_training\\dataset.json"
 
 
 if __name__ == "__main__":

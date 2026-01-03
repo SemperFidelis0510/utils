@@ -65,7 +65,8 @@ class Code:
 
         {{
             "lines": [start_line, end_line],
-            "new_code": "the new code"
+            "new_code": "the new code",
+            "align": number of idents at the beginning of this code snippet
         }}
 
         Note to yourself:
@@ -126,33 +127,14 @@ class Code:
         args = args.split(' ')
         try:
             # Run the Python file in the specified conda environment
-            result = subprocess.run(['conda', 'run', '-n', env_name, 'python', self.path] + args, capture_output=True,
+            result = subprocess.run(['conda', 'run', '-n', env_name, 'python', self.path] + args,
+                                    capture_output=True,
                                     text=True)
             self.output = result.stdout
             self.error = result.stderr
         except Exception as e:
             self.output = ''
             self.error = str(e)
-
-
-
-def run_python_file(file_path, env_name, args=''):
-    args = args.split(' ')
-    try:
-        # Run the Python file in the specified conda environment
-        result = subprocess.run(['conda', 'run', '-n', env_name, 'python', file_path] + args, capture_output=True,
-                                text=True)
-        output = result.stdout
-        error = result.stderr
-    except Exception as e:
-        output = ''
-        error = str(e)
-
-    # Read the code from the file
-    with open(file_path, 'r') as f:
-        code = f.read()
-
-    return Code(code, output, error, path=file_path)
 
 
 def parse():
@@ -171,25 +153,25 @@ def parse():
 
 def main():
     args = parse()
-    j = 0
     args.file = 'SR2.py'
     args.args = '--train'
 
-    for i in range(args.n):
-        j = i
+    code = Code(path=args.file)
 
-        code = run_python_file(args.file, args.env, args.args)
+    for i in range(args.n):
+        code.run(args.env, args.args)
         print(colored(f'code:\n{code.code}', 'yellow'))
         print(colored(f'output:\n{code.output}', 'blue'))
         print(colored(f'error:\n{code.error}', 'red'))
 
         if code.error == '':
+            print(f"All went well. It took {i + 1} runs.")
             break
 
         code.debug(args.model)
         code.to_file()
 
-    print(f"All went well. It took {j + 1} runs.")
+    print(f"Code debugging is incomplete. The last execution ended with an error.")
 
 
 if __name__ == '__main__':
